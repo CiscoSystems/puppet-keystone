@@ -65,6 +65,7 @@ class keystone(
     name   => $::keystone::params::package_name,
     ensure => $package_ensure,
     notify => Exec['keystone-manage db_sync'],
+    tag    => "openstack",
   }
 
   group { 'keystone':
