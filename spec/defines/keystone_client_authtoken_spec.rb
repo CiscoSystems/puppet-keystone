@@ -21,6 +21,8 @@ concat { "/tmp/foo": }
    '/var/lib/puppet/concat/_tmp_foo/fragments/80__tmp_foo_authtoken'
   end
 
+  it { should include_class('keystone::python') }
+
   describe 'with default options' do
     it 'should use defaults to compile fragment template' do
 # TODO why is this path wrong???
@@ -29,9 +31,9 @@ concat { "/tmp/foo": }
           '[filter:authtoken]',
           'paste.filter_factory = keystone.middleware.auth_token:filter_factory',
           'auth_host = 127.0.0.1',
-          'auth_port = 3557',
-          'auth_protocol = https',
-          'auth_uri = https://127.0.0.1:3557',
+          'auth_port = 35357',
+          'auth_protocol = http',
+          'auth_uri = http://127.0.0.1:35357',
           'admin_tenant_name = openstack',
           'admin_user = admin',
           'admin_password = ChangeMe',
