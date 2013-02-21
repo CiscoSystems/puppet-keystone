@@ -33,9 +33,9 @@
 # Copyright 2012 Etienne Pelletier, unless otherwise noted.
 #
 class keystone::db::postgresql(
-  $password      = 'keystone_default_password',
+  $password,
   $dbname        = 'keystone',
-  $user          = 'keystone_admin',
+  $user          = 'keystone_admin'
 ) {
 
   Class['keystone::db::postgresql'] -> Service<| title == 'keystone' |>
@@ -44,8 +44,8 @@ class keystone::db::postgresql(
 
    postgresql::db { "${dbname}":
       user     =>  "${user}",
-      password  =>  "${password}",      
-   }  
+      password  =>  "${password}",
+   }
 
   Postgresql::Db[$dbname] ~> Exec<| title == 'keystone-manage db_sync' |>
 

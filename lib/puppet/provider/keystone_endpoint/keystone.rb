@@ -19,7 +19,7 @@ Puppet::Type.type(:keystone_endpoint).provide(
 
   def self.prefetch(resource)
     # rebuild the cahce for every puppet run
-    @endpoint_hash = build_endpoint_hash
+    @endpoint_hash = nil
   end
 
   def self.endpoint_hash
@@ -39,7 +39,6 @@ Puppet::Type.type(:keystone_endpoint).provide(
   def create
     optional_opts = []
     {
-      :region       => '--region',
       :public_url   => '--publicurl',
       :internal_url => '--internalurl',
       :admin_url    => '--adminurl'
@@ -48,13 +47,16 @@ Puppet::Type.type(:keystone_endpoint).provide(
         optional_opts.push(opt).push(resource[param])
       end
     end
+    (region, service_name) = resource[:name].split('/')
+    resource[:region] = region
+    optional_opts.push('--region').push(resource[:region])
     service_id = self.class.list_keystone_objects('service', 4).detect do |user|
-      user[1] == resource[:name]
+      user[1] == service_name
     end.first
 
     auth_keystone(
       'endpoint-create',
-      '--service', service_id,
+      '--service-id', service_id,
       optional_opts
     )
   end
@@ -87,14 +89,32 @@ Puppet::Type.type(:keystone_endpoint).provide(
     endpoint_hash[resource[:name]][:admin_url]
   end
 
+  def public_url=(value)
+    destroy
+    endpoint_hash[resource[:name]][:public_url] = value
+    create
+  end
+
+  def internal_url=(value)
+    destroy
+    endpoint_hash[resource[:name]][:internal_url] = value
+    create
+  end
+
+  def admin_url=(value)
+    destroy
+    endpoint_hash[resource[:name]][:admin_url]
+    create
+  end
+
   private
 
     def self.build_endpoint_hash
       hash = {}
-      list_keystone_objects('endpoint', 5).each do |endpoint|
+      list_keystone_objects('endpoint', [5,6]).each do |endpoint|
         service_id   = get_service_id(endpoint[0])
         service_name = get_keystone_object('service', service_id, 'name')
-        hash[service_name] = {
+        hash["#{endpoint[1]}/#{service_name}"] = {
           :id           => endpoint[0],
           :region       => endpoint[1],
           :public_url   => endpoint[2],
@@ -109,7 +129,7 @@ Puppet::Type.type(:keystone_endpoint).provide(
     # TODO - this needs to be replaced with a call to endpoint-get
     # but endpoint-get is not currently supported from the admin url
     def self.get_service_id(endpoint_id)
-      `python -c "from keystoneclient.v2_0 import client ; import os ; print [e.service_id for e in client.Client(endpoint='#{admin_endpoint}', token='#{admin_token}').endpoints.list() if e.id == u'#{endpoint_id}'][0]"`
+      `python -c "from keystoneclient.v2_0 import client ; import os ; print [e.service_id for e in client.Client(endpoint='#{admin_endpoint}', token='#{admin_token}').endpoints.list() if e.id == u'#{endpoint_id}'][0]"`.strip()
     end
 
 end
