@@ -10,7 +10,7 @@ describe provider_class do
     let :resource do
       Puppet::Type::Keystone_endpoint.new(
         {
-          :name         => 'foo',
+          :name         => 'region/foo',
           :public_url   => 'public_url',
           :internal_url => 'internal_url',
           :admin_url    => 'admin_url'
@@ -22,7 +22,7 @@ describe provider_class do
     end
     before :each do
       provider_class.expects(:build_endpoint_hash).returns(
-        'foo' => {:id   => 'id'}
+        'region/foo' => {:id   => 'id'}
       )
     end
     after :each do
@@ -44,7 +44,7 @@ describe provider_class do
       provider.expects(:auth_keystone).with do |a,b,c,d|
         (
           a == 'endpoint-create' &&
-          b == '--service'       &&
+          b == '--service-id'       &&
           c == 'id'              &&
           d[d.index('--publicurl')   + 1 ] == 'public_url'   &&
           d[d.index('--adminurl')    + 1 ] ==  'admin_url'   &&

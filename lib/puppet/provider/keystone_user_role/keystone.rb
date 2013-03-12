@@ -38,16 +38,17 @@ Puppet::Type.type(:keystone_user_role).provide(
       role_id = self.class.get_roles[role_name]
       auth_keystone(
         'user-role-add',
-        '--user_id', user_id,
-        '--tenant_id', tenant_id,
-        '--role_id', role_id
+        '--user-id', user_id,
+        '--tenant-id', tenant_id,
+        '--role-id', role_id
       )
     end
   end
 
   def get_user_and_tenant
     user, tenant = resource[:name].split('@', 2)
-    [self.class.get_users[user], self.class.get_tenants[tenant]]
+    tenant_id = self.class.get_tenants[tenant]
+    [self.class.get_users(tenant_id)[user], self.class.get_tenants[tenant]]
   end
 
   def exists?
@@ -58,9 +59,9 @@ Puppet::Type.type(:keystone_user_role).provide(
     user_role_hash[resource[:name]][:role_ids].each do |role_id|
       auth_keystone(
        'user-role-remove',
-       '--user_id', user_role_hash[resource[:name]][:user_id],
-       '--tenant_id', user_role_hash[resource[:name]][:tenant_id],
-       '--role_id', role_id
+       '--user-id', user_role_hash[resource[:name]][:user_id],
+       '--tenant-id', user_role_hash[resource[:name]][:tenant_id],
+       '--role-id', role_id
       )
     end
   end
@@ -85,18 +86,18 @@ Puppet::Type.type(:keystone_user_role).provide(
       role_id = self.class.get_roles[role_name]
       auth_keystone(
         'user-role-add',
-        '--user_id', user_id,
-        '--tenant_id', tenant_id,
-        '--role_id', role_id
+        '--user-id', user_id,
+        '--tenant-id', tenant_id,
+        '--role-id', role_id
       )
     end
     remove.each do |role_name|
       role_id = self.class.get_roles[role_name]
       auth_keystone(
         'user-role-remove',
-        '--user_id', user_id,
-        '--tenant_id', tenant_id,
-        '--role_id', role_id
+        '--user-id', user_id,
+        '--tenant-id', tenant_id,
+        '--role-id', role_id
       )
     end
 
@@ -143,12 +144,7 @@ Puppet::Type.type(:keystone_user_role).provide(
     def self.get_users(tenant_id='')
       @users = {}
 
-      if tenant_id != ''
-        tenant_args = ['--tenant-id', tenant_id]
-      else
-        tenant_args = []
-      end
-      list_keystone_objects('user', 4, *tenant_args).each do |user|
+      list_keystone_objects('user', 4, '--tenant-id', tenant_id).each do |user|
         @users[user[1]] = user[0]
       end
       @users
