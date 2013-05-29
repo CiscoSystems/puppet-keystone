@@ -46,13 +46,40 @@ class Puppet::Provider::Keystone < Puppet::Provider
     self.class.tenant_hash
   end
 
+  def self.reset
+    @admin_endpoint = nil
+    @tenant_hash    = nil
+    @admin_token    = nil
+    @keystone_file  = nil
+  end
+
+  # the path to withenv changes between versions of puppet, so redefining this function here,
+  # Run some code with a specific environment.  Resets the environment at the end of the code.
+  def self.withenv(hash, &block)
+    saved = ENV.to_hash
+    hash.each do |name, val|
+      ENV[name.to_s] = val
+    end
+    block.call
+  ensure
+    ENV.clear
+    saved.each do |name, val|
+      ENV[name] = val
+    end
+  end
+
   def self.auth_keystone(*args)
+    authenv = {:OS_SERVICE_TOKEN => admin_token}
     begin
-      keystone('--token', admin_token, '--endpoint', admin_endpoint, args)
+      withenv authenv do
+        remove_warnings(keystone('--endpoint', admin_endpoint, args))
+      end
     rescue Exception => e
-      if e.message =~ /\(HTTP 400\)/
-       sleep 10
-       keystone('--token', admin_token, '--endpoint', admin_endpoint, args)
+      if (e.message =~ /\[Errno 111\] Connection refused/) or  (e.message =~ /\(HTTP 400\)/)
+        sleep 10
+        withenv authenv do
+          remove_warnings(keystone('--endpoint', admin_endpoint, args))
+        end
       else
         raise(e)
       end
@@ -62,6 +89,29 @@ class Puppet::Provider::Keystone < Puppet::Provider
   def auth_keystone(*args)
     self.class.auth_keystone(args)
   end
+
+  def self.creds_keystone(name, tenant, password, *args)
+    authenv = {:OS_USERNAME => name, :OS_TENANT_NAME => tenant, :OS_PASSWORD => password}
+    begin
+      withenv authenv do
+        remove_warnings(keystone('--os-auth-url', admin_endpoint, args))
+      end
+    rescue Exception => e
+      if (e.message =~ /\[Errno 111\] Connection refused/) or  (e.message =~ /\(HTTP 400\)/)
+        sleep 10
+        withenv authenv do
+          remove_warnings(keystone('--os-auth-url', admin_endpoint, args))
+        end
+      else
+        raise(e)
+      end
+    end
+   end
+
+   def creds_keystone(name, tenant, password, *args)
+     self.class.creds_keystone(name, tenant, password, args)
+   end
+
 
   private
 
@@ -80,6 +130,7 @@ class Puppet::Provider::Keystone < Puppet::Provider
       end
       list
     end
+
     def self.get_keystone_object(type, id, attr)
       id = id.chomp
       auth_keystone("#{type}-get", id).split(/\|\n/m).each do |line|
@@ -94,5 +145,25 @@ class Puppet::Provider::Keystone < Puppet::Provider
         end
       end
       raise(Puppet::Error, "Could not find colummn #{attr} when getting #{type} #{id}")
+    end
+
+    # remove warning from the output. this is a temporary hack until
+    # I refactor things to use the the rest API
+    def self.remove_warnings(results)
+      found_header = false
+      results.split("\n").collect do |line|
+        unless found_header
+          if line =~ /^\+-+\+-+\+$/
+            found_header = true
+            line
+          elsif line =~ /^WARNING/
+            nil
+          else
+            line
+          end
+        else
+          line
+        end
+      end.compact.join("\n")
     end
 end

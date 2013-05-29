@@ -21,7 +21,11 @@
 #     Defaults to False.
 #   [catalog_type] Type of catalog that keystone uses to store endpoints,services. Optional.
 #     Defaults to sql. (Also accepts template)
-#   [enalbles] If the keystone services should be enabled. Optioal. Default to true.
+#   [token_format] Format keystone uses for tokens. Optional. Defaults to UUID.
+#     Supports PKI and UUID.
+#   [cache_dir] Directory created when token_format is PKI. Optional.
+#     Defaults to /var/cache/keystone.
+#   [enabled] If the keystone services should be enabled. Optioal. Default to true.
 #   [sql_conneciton] Url used to connect to database.
 #   [idle_timeout] Timeout when db connections should be reaped.
 #
@@ -49,23 +53,26 @@ class keystone(
   $bind_host      = '0.0.0.0',
   $public_port    = '5000',
   $admin_port     = '35357',
-  $compute_port   = '3000',
-  $verbose        = 'False',
-  $debug          = 'False',
-  $use_syslog     = 'False',
+  $compute_port   = '8774',
+  $verbose        = false,
+  $debug          = false,
+  $use_syslog     = false,
   $catalog_type   = 'sql',
+  $token_format   = 'UUID',
+  $cache_dir      = '/var/cache/keystone',
   $enabled        = true,
   $sql_connection = 'sqlite:////var/lib/keystone/keystone.db',
   $idle_timeout   = '200'
 ) {
 
   validate_re($catalog_type,   'template|sql')
+  validate_re($token_format,  'UUID|PKI')
 
   File['/etc/keystone/keystone.conf'] -> Keystone_config<||> ~> Service['keystone']
   Keystone_config<||> ~> Exec<| title == 'keystone-manage db_sync'|>
 
   # TODO implement syslog features
-  if ( $use_syslog != 'False') {
+  if ( $use_syslog != false) {
     fail('use syslog currently only accepts false')
   }
 
@@ -75,7 +82,6 @@ class keystone(
     ensure  => present,
     owner   => 'keystone',
     group   => 'keystone',
-    mode    => '0644',
     require => Package['keystone'],
     notify  => Service['keystone'],
   }
@@ -101,6 +107,7 @@ class keystone(
 
   file { ['/etc/keystone', '/var/log/keystone', '/var/lib/keystone']:
     ensure  => directory,
+    mode    => '0750',
   }
 
   file { '/etc/keystone/keystone.conf':
@@ -148,6 +155,16 @@ class keystone(
     }
   }
 
+  keystone_config { 'signing/token_format': value => $token_format }
+  if($token_format  == 'PKI') {
+    file { $cache_dir:
+      ensure => directory,
+    }
+    exec { '/usr/bin/keystone-manage pki_setup':
+      creates => '/etc/keystone/ssl/private/signing_key.pem'
+    }
+  }
+
   if $enabled {
     $service_ensure = 'running'
   } else {
@@ -168,9 +185,11 @@ class keystone(
     # created
     exec { 'keystone-manage db_sync':
       path        => '/usr/bin',
+      user        => 'keystone',
       refreshonly => true,
       notify      => Service['keystone'],
       subscribe   => Package['keystone'],
+      require     => User['keystone'],
     }
   }
 }
