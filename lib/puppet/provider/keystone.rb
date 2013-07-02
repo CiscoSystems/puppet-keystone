@@ -49,7 +49,7 @@ class Puppet::Provider::Keystone < Puppet::Provider
     begin
       keystone('--token', admin_token, '--endpoint', admin_endpoint, args)
     rescue Exception => e
-      if e.message =~ /\(HTTP 400\)/
+      if (e.message =~ /\[Errno 111\] Connection refused/) or (e.message =~ /\(HTTP 400\)/) or (e.message =~ /HTTP Unable to establish connection/)
        sleep 10
        keystone('--token', admin_token, '--endpoint', admin_endpoint, args)
       else
