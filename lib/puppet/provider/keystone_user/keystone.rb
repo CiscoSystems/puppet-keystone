@@ -21,7 +21,7 @@ Puppet::Type.type(:keystone_user).provide(
 
   def self.prefetch(resource)
     # rebuild the cahce for every puppet run
-    @user_hash = build_user_hash
+    @user_hash = nil
   end
 
   def self.user_hash
@@ -80,23 +80,30 @@ Puppet::Type.type(:keystone_user).provide(
     )
   end
 
-#  def password
-#    Puppet.warning("Cannot retrieve password")
-#    user_hash[resource[:name]][:password]
-#  end
-#
-#  def password=(value)
-#    Puppet.warning('Cannot update password')
-#    # user-password-update does not support the ability know what the
-#    # current value is
-#    #auth_keystone(
-#    #  'user-password-update',
-#    #  '--pass', value,
-#    #  user_hash[resource[:name]][:id]
-#  end
+  def password
+    # if we don't know a password we can't test it
+    return nil if resource[:password] == nil
+    # we can't get the value of the password but we can test to see if the one we know
+    # about works, if it doesn't then return nil, causing it to be reset
+    begin
+      token_out = creds_keystone(resource[:name], resource[:tenant], resource[:password], "token-get")
+    rescue Exception => e
+      return nil if e.message =~ /Not Authorized/
+      raise e
+    end
+    return resource[:password]
+  end
+
+  def password=(value)
+    auth_keystone('user-password-update', '--pass', value, user_hash[resource[:name]][:id])
+  end
 
   def tenant
     user_hash[resource[:name]][:tenant]
+  end
+
+  def tenant=(value)
+    fail("tenant cannot be updated. Transition requested: #{user_hash[resource[:name]][:tenant]} -> #{value}")
   end
 
   def email
@@ -108,7 +115,7 @@ Puppet::Type.type(:keystone_user).provide(
       "user-update",
       '--email', value,
       user_hash[resource[:name]][:id]
-    ) 
+    )
   end
 
   def id
@@ -120,14 +127,27 @@ Puppet::Type.type(:keystone_user).provide(
     def self.build_user_hash
       hash = {}
       list_keystone_objects('user', 4).each do |user|
-        tenantId = get_keystone_object('user', user[0], 'tenantId')
-        tenant   = tenantId == 'None' ? 'None' : get_keystone_object('tenant', tenantId, 'name')
+        begin
+          tenantId = get_keystone_object('user', user[0], 'tenantId')
+        rescue
+          tenantId = nil
+        end
+        if tenantId.nil? or tenantId == 'None' or tenantId.empty?
+          tenant = 'None'
+        else
+          # this prevents is from failing if tenant no longer exists
+          begin
+            tenant = get_keystone_object('tenant', tenantId, 'name')
+          rescue
+            tenant = 'None'
+          end
+        end
         password = 'nil'
-        hash[user[3]] = {
+        hash[user[1]] = {
           :id          => user[0],
-          :enabled     => user[1],
-          :email       => user[2],
-          :name        => user[3],
+          :enabled     => user[2],
+          :email       => user[3],
+          :name        => user[1],
           :password    => password,
           :tenant      => tenant
         }
