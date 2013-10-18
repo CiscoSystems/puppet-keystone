@@ -46,7 +46,7 @@ class { 'keystone':
   verbose        => 'True',
   catalog_type   => 'sql',
   admin_token    => 'random_uuid',
-  sql_connection => 'mysql://keystone:secret_identity_password@openstack-controller.example.com/keystone',
+  sql_connection => 'mysql://keystone_admin:super_secret_db_password@openstack-controller.example.com/keystone',
 }
 
 # Adds the admin credential to keystone.
@@ -160,6 +160,14 @@ Contributors
 
 Release Notes
 -------------
+
+**2.2.0**
+
+* Optimized tenant and user queries.
+* Added syslog support.
+* Added support for token driver backend.
+* Various bug and lint fixes.
+
 **2.1.0**
 
 * Tracks release of puppet-quantum
