@@ -161,6 +161,20 @@ Contributors
 Release Notes
 -------------
 
+**3.0.0**
+
+* Major release for OpenStack Havana.
+* Fixed duplicated keystone endpoints.
+* Refactored keystone_endpoint to use prefetch and flush paradigm.
+* Switched from signing/format to token/provider.
+* Created memcache_servers option to allow for multiple cache servers.
+* Enabled serving Keystone from Apache mod_wsgi.
+* Moved db_sync to its own class.
+* Removed creation of Member role.
+* Improved performance of Keystone providers.
+* Updated endpoints to support paths and ssl.
+* Added support for token expiration parameter.
+
 **2.2.0**
 
 * Optimized tenant and user queries.
